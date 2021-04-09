@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<asset version="2.13.0.0">
+	<guid>8ffb008b9bf85c6e239d78f5998cb5d0da550eef</guid>
+	<type>component</type>
+	<hash>17aae262</hash>
+	<runtimes>
+		<runtime id="8ffb008b9bf85c6e239d78f5998cb5d0da550eef" name="UltralightImpl.cs" link="0"/>
+		<runtime id="ac0aef82b81ce8f9db0afe048b977193c1bb49d6" name="UltralightImpl.prop" link="1"/>
+	</runtimes>
+</asset>

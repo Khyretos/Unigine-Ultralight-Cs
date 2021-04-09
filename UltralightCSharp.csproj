@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net5.0</TargetFramework>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+		<GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
+		<GenerateAssemblyTitleAttribute>false</GenerateAssemblyTitleAttribute>
+		<GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
+		<RootNamespace>UnigineApp</RootNamespace>
+		<StartupObject>UnigineApp.UnigineApp</StartupObject>
+		<WarningLevel>4</WarningLevel>
+		<OutputPath>bin</OutputPath>
+		<EnableDefaultItems>false</EnableDefaultItems>
+		<SkipPostBuild>false</SkipPostBuild>
+		<PlatformTarget>x64</PlatformTarget>
+		<DebugType>portable</DebugType>
+		<DOTNET_HOST_PATH Condition="'$(DOTNET_HOST_PATH)' == ''">dotnet</DOTNET_HOST_PATH>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)'=='Debug'">
+		<AssemblyName>UltralightCSharp_x64d</AssemblyName>
+		<DebugSymbols>true</DebugSymbols>
+		<Optimize>false</Optimize>
+		<DefineConstants>TRACE;DEBUG;</DefineConstants>
+	</PropertyGroup>
+	<ItemGroup Condition="'$(Configuration)'=='Debug'">
+		<Reference Include="UnigineSharp_x64d">
+			<SpecificVersion>false</SpecificVersion>
+			<HintPath>bin\UnigineSharp_x64d.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+	<PropertyGroup Condition="'$(Configuration)'=='Release'">
+		<AssemblyName>UltralightCSharp_x64</AssemblyName>
+		<Optimize>true</Optimize>
+		<DefineConstants>TRACE;NDEBUG;</DefineConstants>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+	<ItemGroup Condition="'$(Configuration)'=='Release'">
+		<Reference Include="UnigineSharp_x64">
+			<SpecificVersion>false</SpecificVersion>
+			<HintPath>bin\UnigineSharp_x64.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Include="data/UltralightImpl.cs" />
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Include="data\csharp_template\first_person_controller\components\FirstPersonController.cs" />
+		<Compile Include="source\AppEditorLogic.cs" />
+		<Compile Include="source\AppSystemLogic.cs" />
+		<Compile Include="source\AppWorldLogic.cs" />
+		<Compile Include="source\main.cs" />
+	</ItemGroup>
+	<ItemGroup>
+	  <PackageReference Include="ImpromptuNinjas.UltralightSharp" Version="1.2.0-beta-r11" />
+	  <PackageReference Include="UltralightNet" Version="1.2.1-alpha.5" />
+	  <PackageReference Include="UltralightNet.AppCore" Version="1.2.1-alpha.5" />
+	  <PackageReference Include="UltralightNet.Binaries" Version="1.2.1-alpha.5" />
+	  <PackageReference Include="UltralightNet.Resources" Version="1.2.1-alpha.5" />
+	</ItemGroup>
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Exec Command="&quot;$(DOTNET_HOST_PATH)&quot; &quot;$(OutputPath)cspropgen_x64d.dll&quot; -p &quot;$(OutputPath)$(AssemblyName).dll&quot; -data_path ../data/" Condition="'$(Configuration)'=='Debug' And $(SkipPostBuild)=='false'" />
+		<Exec Command="&quot;$(DOTNET_HOST_PATH)&quot; &quot;$(OutputPath)cspropgen_x64.dll&quot; -p &quot;$(OutputPath)$(AssemblyName).dll&quot; -data_path ../data/" Condition="'$(Configuration)'=='Release' And $(SkipPostBuild)=='false'" />
+	</Target>
+</Project>
