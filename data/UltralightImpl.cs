@@ -1,13 +1,9 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using Unigine;
 using UltralightNet;
 using UltralightNet.AppCore;
 using ImpromptuNinjas.UltralightSharp;
 using System.Text;
-using System.Runtime.InteropServices;
-using System.Threading;
 using View = UltralightNet.View;
 using App = Unigine.App;
 using Session = UltralightNet.Session;
@@ -22,22 +18,16 @@ public class UltralightImpl : Component
 	ULBitmap bitmap;
 	// - UltralightNet
 
-	// + UltralightSharp
-
-	// - UltralightSharp
-
-	Texture texture = new Texture();
-	Blob blob = new Blob();
+	// + Unigine
 	Gui gui;
 	WidgetSprite hud;
-	static int saved_mouse = 0;
-
 	int Ultralight_Gui_Id;
-
-	// + Unigine Callback Pointers
-	static IntPtr before_render_callback_handle;
+	Blob blob = new Blob();
+	static int saved_mouse = 0;
+	Texture texture = new Texture();
 	static IntPtr after_render_callback_handle;
-	// - Unigine Callback Pointers
+	static IntPtr before_render_callback_handle;
+	// - Unigine
 
 	void Handle_Mouse_Movement()
 	{
@@ -113,15 +103,16 @@ public class UltralightImpl : Component
 
 	int on_key_pressed(uint key)
 	{
-        if (key == App.KEY_ESC )
+		if (key == App.KEY_ESC)
+		{
+			gui.Hidden = !gui.Hidden;
 			hud.Hidden = gui.Hidden;
-
+		}
 		var Convertedkey = SpecialKeyToInt((int)key);
 
 		ULKeyEvent evt = new(ULKeyEventType.RawKeyDown, 0, Convertedkey, Convertedkey, string.Empty, string.Empty, false, false, false);
 
 		view.FireKeyEvent(evt);
-
 		return 0;
 	}
 
@@ -132,7 +123,6 @@ public class UltralightImpl : Component
 		ULKeyEvent evt = new ULKeyEvent(ULKeyEventType.KeyUp, 0, Convertedkey, Convertedkey, string.Empty, string.Empty, false, false, false);
 
 		view.FireKeyEvent(evt);
-
 		return 0;
 	}
 
@@ -147,7 +137,6 @@ public class UltralightImpl : Component
 
 			view.FireKeyEvent(evt);
 		}
-
 		return 0;
 	}
 
@@ -260,7 +249,7 @@ public class UltralightImpl : Component
 		return ConvertedKey;
 	}
 
-	public void Init()
+	public unsafe void Init()
 	{
 		// + [Unigine] 
 
@@ -280,13 +269,12 @@ public class UltralightImpl : Component
 		after_render_callback_handle = Engine.AddCallback(Engine.CALLBACK_INDEX.END_RENDER, after_render_callback);
 
 		createHUDWidgetSprite();
-
 		// - [Unigine] 
 
-		// [Ultralight] Set Font Loader
+		// + [Ultralight] 
 		AppCoreMethods.ulEnablePlatformFontLoader();
 
-		AppCoreMethods.ulEnablePlatformFileSystem("./resources");
+		AppCoreMethods.ulEnablePlatformFileSystem("./resources");		
 
 		// Create config, used for specifying resources folder (used for URL loading)
 		ULConfig config = new()
@@ -305,49 +293,61 @@ public class UltralightImpl : Component
 
 		surface = view.Surface;
 
-		view.URL = "https://github.com";
+		//view.URL = "https://github.com";
 		//view.URL = "file:///sample5.html";
 		//view.URL = "file:///x.html";
 		//view.URL = "file:///index.html";
-		//view.HTML= Test(); 
+		//view.HTML= Test();
 		//view.HTML= Sample1(); // Requires "UltralightNet.Resources"
 		//view.HTML = Sample2(); // Requires "UltralightNet.Resources"
-		//view.HTML = Sample4(); // Requires "UltralightNet.Resources"
+		view.HTML = Sample4(); // Requires "UltralightNet.Resources"
+
+		view.SetChangeCursorCallback((user_data, caller, frame_id) =>
+		{
+			//Unigine.Console.WriteLine("Dom is ready");
+		});
 
 		view.SetDOMReadyCallback((user_data, caller, frame_id, is_main_frame, url) =>
 		{
-			//Unigine.Console.WriteLine("Dom is ready");
-			//
-			//JsContext* context = (JsContext*)view.LockJSContext();
-			//
-			//context().
-			//
-			//
-			//JsValue GetMessage = new JsValue()
-			//{
-			//
-			//};
-			//
-			//JsClass getmessage = new JsClass();
-			//JsString message2 = new JsString()
-			//{
-			//};
+			Unigine.Console.WriteLine("Dom is ready");
 
-			//JavaScriptCore.JsValueMakeString(context, (JsString*)message2);
+			string exception = "Oops!";
+			view.EvaluateScript("ShowMessage('Howdy!')", out exception);
 
-            //getmessage.CreateGlobalContext();
-			//context
+			var context = view.LockJSContext();
+			var ctx = (JsContext*)context;
 
-			//JsObjectPrivate global = new JsObjectPrivate();
+			JsValue* globalObj = JavaScriptCore.ContextGetGlobalObject(ctx);
 
-			//global.CreateContext();
+			// [Ultralight] Register Callback OnButtonClick that excecutes js on demand
+			JsString* name1 = JsString.Create("OnButtonClick");
+			var func1 = JavaScriptCore.JsObjectMakeFunctionWithCallback(ctx, name1, new FnPtr<ObjectCallAsFunctionCallback>(OnButtonClick));
+			JavaScriptCore.JsObjectSetProperty(ctx, globalObj, name1, func1, 0, null);
+
+			// [Ultralight] Register Callback GetMessage that returns a value
+			JsString* name2 = JsString.Create("GetMessage");
+			var func2 = JavaScriptCore.JsObjectMakeFunctionWithCallback(ctx, name2, new FnPtr<ObjectCallAsFunctionCallback>(GetMessage));			
+			JavaScriptCore.JsObjectSetProperty(ctx, globalObj, name2, func2, 0, null);
 		});
+		// - [Ultralight] 
 	}
 
-	public void SetDOMReadyCallback(ULDOMReadyCallback callback)
+	public unsafe JsValue* OnButtonClick(JsContext* ctx, JsValue* function, JsValue* thisObject, UIntPtr argumentCount, JsValue** arguments, JsValue** exception)
     {
-		
-    }
+		var str = JsString.Create("document.getElementById('result').innerText = 'Ultralight rocks!'");
+		var script = JavaScriptCore.StringRetain(str);
+
+		JavaScriptCore.EvaluateScript(ctx, script, thisObject, null, 0, exception);
+		JavaScriptCore.StringRelease(script);
+
+		return JavaScriptCore.JsValueMakeNull(ctx);
+	}
+
+	public unsafe JsValue* GetMessage(JsContext* ctx, JsValue* function, JsValue* thisObject, UIntPtr argumentCount, JsValue** arguments, JsValue** exception)
+	{
+		var str = JsString.Create("Hello from C#!<br/>Ultralight rocks!");
+		return JavaScriptCore.JsValueMakeString(ctx, str);
+	}
 
 	void createHUDWidgetSprite() 
 	{
@@ -404,20 +404,17 @@ public class UltralightImpl : Component
 
 	string Test()
 	{
-		string page = @"
+		string page = 
+			@"
 			<html>
-				<head>
-					<style>
-					body {
-						background-color: transparent;
-					}
-					</style>
-				</head>
-				<body>
-					<h1>The background - color Property</h1>
-					<p>The background color can be specified with a color name.</p>
-				</body>
-			</html>";
+			  <head>
+			  </head>
+			  <body>
+				<button onclick=""OnButtonClick();"">Click Me</button>
+				<div id=""result""></div>
+			  </body>
+			</html>
+			";
 		return page;
 	}
 
@@ -425,46 +422,46 @@ public class UltralightImpl : Component
 	{
 		string xxxx =
 			@"
-				<html>
-				  <head>
+			<html>
+				<head>
 					<style type=""text/css"">
-					  body {
-						margin: 0;
-						padding: 0;
-						overflow: hidden;
-						color: black;
-						font-family: Arial;
-						background: linear-gradient(-45deg, #acb4ff, #f5d4e2);
-						display: flex;
-						justify-content: center;
-						align-items: center;
-					  }
-					  div {
-						width: 350px;
-						height: 350px;
-						text-align: center;
-						border-radius: 25px;
-						background: linear-gradient(-45deg, #e5eaf9, #f9eaf6);
-						box-shadow: 0 7px 18px -6px #8f8ae1;
-					  }
-					  h1 {
-						padding: 1em;
-					  }
-					  p {
-						background: white;
-						padding: 2em;
-						margin: 40px;
-						border-radius: 25px;
-					  }
+						body {
+							margin: 0;
+							padding: 0;
+							overflow: hidden;
+							color: black;
+							font-family: Arial;
+							background: linear-gradient(-45deg, #acb4ff, #f5d4e2);
+							display: flex;
+							justify-content: center;
+							align-items: center;
+						}
+						div {
+							width: 350px;
+							height: 350px;
+							text-align: center;
+							border-radius: 25px;
+							background: linear-gradient(-45deg, #e5eaf9, #f9eaf6);
+							box-shadow: 0 7px 18px -6px #8f8ae1;
+						}
+						h1 {
+							padding: 1em;
+						}
+						p {
+							background: white;
+							padding: 2em;
+							margin: 40px;
+							border-radius: 25px;
+						}
 					</style>
-				  </head>
-				  <body>
+				</head>
+				<body>
 					<div>
-					  <h1>Hello World!</h1>
-					  <p>Welcome to Ultralight!</p>
+						<h1>Hello World!</h1>
+						<p>Welcome to Ultralight!</p>
 					</div>
-				  </body>
-				</html>
+				</body>
+			</html>
 			";
 		return xxxx;
 	}
@@ -472,132 +469,134 @@ public class UltralightImpl : Component
 	string Sample2()
 	{
 		string xxxx =
-			@"<html>
-  <head>
-    <style type=""text/css"">
-    * { -webkit-user-select: none; }
-    body { 
-      overflow: hidden;
-      margin: 0;
-      padding: 0;
-      background-color: #e0e3ed;
-      background: linear-gradient(-45deg, #e0e3ed, #f7f9fc);
-      width: 900px;
-      height: 600px;
-      font-family: -apple-system, 'Segoe UI', Ubuntu, Arial, sans-serif;
-    }
-    h2, h3 {
-      margin: 0;
-    }
-    div {
-      padding: 35px;
-      margin: 10px;
-      height: 510px;
-      width: 360px;
-    }
-    p, li { 
-      font-size: 1em;
-    }
-    #leftPane {
-      float: left;
-      color: #858998;
-      padding: 85px 65px;
-      height: 410px;
-      width: 300px;
-    }
-    #leftPane p {
-      color: #858998;
-    }
-    #rightPane {
-      border-radius: 15px;
-      background-color: white;
-      float: right;
-      color: #22283d;
-      box-shadow: 0 7px 24px -6px #aaacb8;
-    }
-    #rightPane li, #rightPane p {
-      color: #7e7f8e;
-      font-size: 0.9em;
-    }
-    #rightPane li {
-      list-style-type: none;
-      padding: 0.6em 0;
-      border-radius: 20px;
-      margin: 0;
-      padding-left: 1em;
-      cursor: pointer;
-    }
-    #rightPane li:hover {
-      background-color: #f4f6fb;
-    }
-    li:before {
-      content: '';
-      display:inline-block; 
-      height: 18; 
-      width: 18;
-      margin-bottom: -5px; 
-      margin-right: 1em;
-      background-image: url(""data:image/svg+xml;utf8,<svg xmlns=\
-'http://www.w3.org/2000/svg' width='18' height='18' viewBox='-2 -2 27 27'>\
-<path stroke='%23dbe2e7' stroke-width='2' fill='white' d='M12 0c-6.627 0-12 \
-5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12z'/></svg>"");
-    }
-    li.checked:before {
-      background-image: url(""data:image/svg+xml;utf8,<svg xmlns=\
-'http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><path \
-fill='%2334d7d6' d='M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 \
-12-12-5.373-12-12-12zm-1.25 17.292l-4.5-4.364 1.857-1.858 2.643 2.506 \
-5.643-5.784 1.857 1.857-7.5 7.643z'/></svg>"");
-    }
-    #rightPane h5 {
-      border-bottom: 1px solid #eceef0;
-      padding-bottom: 9px;
-      margin-bottom: 1em;
-      margin-top: 3em;
-    }
-    #rightPane h5 {
-      padding-left: 1em;
-    }
-    #rightPane ul {
-      padding-left: 0;
-    }
-    </style>
-    <script>
-      window.onload = function() {
-        var listItems = document.getElementsByTagName('li');
-        for(var i = 0; i < listItems.length; i++) {
-          listItems[i].onclick = function() {
-            this.classList.toggle('checked');
-          }
-        }
-      }
-  </script>
-  </head>
-  <body>
-    <div id=""leftPane"">
-      <h2>My Planner App</h2>
-      <p>Welcome to Ultralight Tutorial 2!</p>
-    </div>
-    <div id=""rightPane"">
-      <h3>Upcoming Tasks</h3>
-      <p>Click a task to mark it as completed.</p>
-      <h5>Today</h5>
-      <ul>
-        <li class=""checked"">Create layout for initial mockup</li>
-        <li class=""checked"">Select icons for mobile interface</li>
-        <li class=""checked"">Discussions regarding new sorting algorithm</li>
-        <li class=""checked"">Call with automotive clients</li>
-        <li>Create quote for the Tesla remodel</li>
-      </ul>
-      <h5>Upcoming</h5>
-      <ul>
-        <li>Plan itinerary for conference</li>
-        <li>Discuss desktop workflow optimizations</li>
-        <li>Performance improvement analysis</li>
-      </ul>
-    </div>
-  </body>
-</html>";
+			@"
+			<html>
+			  <head>
+				<style type=""text/css"">
+				* { -webkit-user-select: none; }
+				body { 
+				  overflow: hidden;
+				  margin: 0;
+				  padding: 0;
+				  background-color: #e0e3ed;
+				  background: linear-gradient(-45deg, #e0e3ed, #f7f9fc);
+				  width: 900px;
+				  height: 600px;
+				  font-family: -apple-system, 'Segoe UI', Ubuntu, Arial, sans-serif;
+				}
+				h2, h3 {
+				  margin: 0;
+				}
+				div {
+				  padding: 35px;
+				  margin: 10px;
+				  height: 510px;
+				  width: 360px;
+				}
+				p, li { 
+				  font-size: 1em;
+				}
+				#leftPane {
+				  float: left;
+				  color: #858998;
+				  padding: 85px 65px;
+				  height: 410px;
+				  width: 300px;
+				}
+				#leftPane p {
+				  color: #858998;
+				}
+				#rightPane {
+				  border-radius: 15px;
+				  background-color: white;
+				  float: right;
+				  color: #22283d;
+				  box-shadow: 0 7px 24px -6px #aaacb8;
+				}
+				#rightPane li, #rightPane p {
+				  color: #7e7f8e;
+				  font-size: 0.9em;
+				}
+				#rightPane li {
+				  list-style-type: none;
+				  padding: 0.6em 0;
+				  border-radius: 20px;
+				  margin: 0;
+				  padding-left: 1em;
+				  cursor: pointer;
+				}
+				#rightPane li:hover {
+				  background-color: #f4f6fb;
+				}
+				li:before {
+				  content: '';
+				  display:inline-block; 
+				  height: 18; 
+				  width: 18;
+				  margin-bottom: -5px; 
+				  margin-right: 1em;
+				  background-image: url(""data:image/svg+xml;utf8,<svg xmlns=\
+			'http://www.w3.org/2000/svg' width='18' height='18' viewBox='-2 -2 27 27'>\
+			<path stroke='%23dbe2e7' stroke-width='2' fill='white' d='M12 0c-6.627 0-12 \
+			5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12z'/></svg>"");
+				}
+				li.checked:before {
+				  background-image: url(""data:image/svg+xml;utf8,<svg xmlns=\
+			'http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><path \
+			fill='%2334d7d6' d='M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 \
+			12-12-5.373-12-12-12zm-1.25 17.292l-4.5-4.364 1.857-1.858 2.643 2.506 \
+			5.643-5.784 1.857 1.857-7.5 7.643z'/></svg>"");
+				}
+				#rightPane h5 {
+				  border-bottom: 1px solid #eceef0;
+				  padding-bottom: 9px;
+				  margin-bottom: 1em;
+				  margin-top: 3em;
+				}
+				#rightPane h5 {
+				  padding-left: 1em;
+				}
+				#rightPane ul {
+				  padding-left: 0;
+				}
+				</style>
+				<script>
+				  window.onload = function() {
+					var listItems = document.getElementsByTagName('li');
+					for(var i = 0; i < listItems.length; i++) {
+					  listItems[i].onclick = function() {
+						this.classList.toggle('checked');
+					  }
+					}
+				  }
+			  </script>
+			  </head>
+			  <body>
+				<div id=""leftPane"">
+				  <h2>My Planner App</h2>
+				  <p>Welcome to Ultralight Tutorial 2!</p>
+				</div>
+				<div id=""rightPane"">
+				  <h3>Upcoming Tasks</h3>
+				  <p>Click a task to mark it as completed.</p>
+				  <h5>Today</h5>
+				  <ul>
+					<li class=""checked"">Create layout for initial mockup</li>
+					<li class=""checked"">Select icons for mobile interface</li>
+					<li class=""checked"">Discussions regarding new sorting algorithm</li>
+					<li class=""checked"">Call with automotive clients</li>
+					<li>Create quote for the Tesla remodel</li>
+				  </ul>
+				  <h5>Upcoming</h5>
+				  <ul>
+					<li>Plan itinerary for conference</li>
+					<li>Discuss desktop workflow optimizations</li>
+					<li>Performance improvement analysis</li>
+				  </ul>
+				</div>
+			  </body>
+			</html>
+			";
 		return xxxx;
 	}
 	
@@ -605,56 +604,56 @@ fill='%2334d7d6' d='M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 \
 	{
 		string xxxx =
 			@"
-				<html>
-				  <head>
-					<style type=""text/css"">
-					  * { -webkit-user-select: none; }
-					  body { 
-						font-family: -apple-system, 'Segoe UI', Ubuntu, Arial, sans-serif; 
-						text-align: center;
-						background: linear-gradient(#FFF, #DDD);
-						padding: 2em;
-					  }
-					  body.rainbow {
-						background: linear-gradient(90deg, #ff2363, #fff175, #68ff9d, 
-														   #45dce0, #6c6eff, #9e23ff, #ff3091);
-						background-size: 1000% 1000%;
-						animation: ScrollGradient 10s ease infinite;
-					  }
-					  @keyframes ScrollGradient {
-						0%   { background-position:0% 50%; }
-						50%  { background-position:100% 50%; }
-						100% { background-position:0% 50%; }
-					  }
-					  #message {
-						padding-top: 2em;
-						color: white;
-						font-weight: bold;
-						font-size: 24px;
-						text-shadow: 1px 1px rgba(0, 0, 0, 0.4);
-					  }
-					</style>
-					<script type=""text/javascript"">
-					function HandleButton(evt) {
-					  // Call our C++ callback 'GetMessage'
-					  var message = GetMessage();
-      
-					  // Display the result in our 'message' div element and apply the
-					  // rainbow effect to our document's body.
-					  document.getElementById('message').innerHTML = message;
-					  document.body.classList.add('rainbow');
+			<html>
+				<head>
+				<style type=""text/css"">
+					* { -webkit-user-select: none; }
+					body { 
+					font-family: -apple-system, 'Segoe UI', Ubuntu, Arial, sans-serif; 
+					text-align: center;
+					background: linear-gradient(#FFF, #DDD);
+					padding: 2em;
 					}
-					</script>
-				  </head>
-				  <body>
-					<button onclick=""HandleButton(event);"">Get the Secret Message!</button>
-					<div id=""message""></div>
-				  </body>
-				</html>
+					body.rainbow {
+					background: linear-gradient(90deg, #ff2363, #fff175, #68ff9d, 
+														#45dce0, #6c6eff, #9e23ff, #ff3091);
+					background-size: 1000% 1000%;
+					animation: ScrollGradient 10s ease infinite;
+					}
+					@keyframes ScrollGradient {
+					0%   { background-position:0% 50%; }
+					50%  { background-position:100% 50%; }
+					100% { background-position:0% 50%; }
+					}
+					#message {
+					padding-top: 2em;
+					color: white;
+					font-weight: bold;
+					font-size: 24px;
+					text-shadow: 1px 1px rgba(0, 0, 0, 0.4);
+					}
+				</style>
+				<script type=""text/javascript"">
+				function HandleButton(evt) {
+					// Call our C++ callback 'GetMessage'
+					var message = GetMessage();
+      
+					// Display the result in our 'message' div element and apply the
+					// rainbow effect to our document's body.
+					document.getElementById('message').innerHTML = message;
+					document.body.classList.add('rainbow');
+				}
+				</script>
+				</head>
+				<body>
+				<button onclick=""HandleButton(event);"">Get the Secret Message!</button>
+				<div id=""message""></div>
+				</body>
+			</html>
 			";
 		return xxxx;
 	}
-
+	
 	private void Update()
 	{
 		renderer.Update();
@@ -680,8 +679,6 @@ fill='%2334d7d6' d='M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 \
 		bool r = ( (gui.MouseX > 0) && (gui.MouseY > 0) && (gui.MouseX < hud.Width) && (gui.MouseY < hud.Height));
         {
 			hud.Hidden = r ? false : true;
-
-			//Unigine.Console.WriteLine(r);
 			return r;
 		}
 	}
@@ -694,5 +691,3 @@ fill='%2334d7d6' d='M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 \
 	{
 	}
 }
-
-
