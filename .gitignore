@@ -30,6 +30,7 @@
 
 # Unigine
 /bin/*
+!/bin/resources
 /.thumbnails/*
 /data/.thumbnails/*
 /data/.cache_textures/*
